@@ -1,4 +1,0 @@
-"/Users/wenyongyan/Library/Application Support/JetBrains/Toolbox/apps/CLion/ch-0/212.5284.51/CLion.app/Contents/bin/cmake/mac/bin/cmake" -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/usr/bin/make -DCMAKE_DEPENDS_USE_COMPILER=FALSE -G "CodeBlocks - Unix Makefiles" "/Users/wenyongyan/Documents/文稿 - 闻永言的MacBook Pro/Documents/Code/C++/Reconstructor"
--- Configuring done
--- Generating done
--- Build files have been written to: /Users/wenyongyan/Documents/文稿 - 闻永言的MacBook Pro/Documents/Code/C++/Reconstructor/cmake-build-release
