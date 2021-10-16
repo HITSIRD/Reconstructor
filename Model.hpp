@@ -31,7 +31,8 @@ namespace SfS
         MASK_LEFT = 0b00111011,
         MASK_RIGHT = 0b00110111,
         MASK_TOP = 0b00101111,
-        MASK_BOTTOM = 0b00011111
+        MASK_BOTTOM = 0b00011111,
+        BOUND = 0b00111111
     };
 
     enum ProjectionMode
@@ -232,13 +233,6 @@ private:
     /**
      *
      * @param index
-     * @return
-     */
-    bool is_bound(index_t index) const;
-
-    /**
-     *
-     * @param index
      */
     void update_bound(index_t index) const;
 
@@ -270,9 +264,9 @@ private:
 
     /**
      *
-     * @param v
+     * @param c center world coordinate
      */
-    void draw_circle(const Vertex &v) const;
+    void draw_circle(const float4 &c) const;
 
     /**
      *

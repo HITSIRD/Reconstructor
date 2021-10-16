@@ -257,7 +257,8 @@ void Model::back_projection_fast()
         {
             for (int index_y = 0; index_y < y; index_y++, voxel_index++)
             {
-                draw_circle(vertices[voxel_index]);
+                index_t index = (index_z * vx + index_x) * vy + index_y;
+                draw_circle(vertices[index].world + float4(voxel_radius, voxel_radius, voxel_radius, 0));
                 terms_array->indices[voxel_index + 1] = terms_array->num_terms; // record index
                 count++;
             }
@@ -289,7 +290,9 @@ void Model::local_min_search()
     cout << "number to test is " << num_to_test << endl;
     cout << "number of occupied is " << num_occupied << endl;
 
-    while (label_changed != 0)
+    error_t last_turn_error = sfis_error;
+
+    while (true)
     {
         cout << "turn " << turn << ": number to test is " << num_to_test << ", " << "number of occupied is "
              << num_occupied << ", ";
@@ -301,14 +304,16 @@ void Model::local_min_search()
             if (voxels[i].test)
             {
                 int64_t partial = calculate_partial(i);
-                bool condition_0 = partial < 0 && voxels[i].occupied;
-                bool condition_1 = partial >= 0 && (!voxels[i].occupied);
+                bool condition_0 = partial <= 0 && voxels[i].occupied;
+                bool condition_1 = partial > 0 && (!voxels[i].occupied);
                 if (condition_0 || condition_1)
                 {
+                    label_changed++;
                     uint64_t start_index = terms_array->indices[i];
                     uint64_t end_index = terms_array->indices[i + 1];
                     index_t buffer_index = start_index / terms_array->term_buffer_size;
                     index_t term_index = start_index % terms_array->term_buffer_size;
+
                     if (voxels[i].occupied)
                     {
                         voxels[i].occupied = false;
@@ -336,15 +341,20 @@ void Model::local_min_search()
                             }
                             index_t index = terms_array->terms[buffer_index][term_index];
                             occupied_config[index]++;
-
                         }
                     }
 
                     sfis_error -= abs(partial);
-                    label_changed++;
                 }
             }
         }
+
+        if (last_turn_error <= sfis_error)
+        {
+            cout << "label changed: " << label_changed << ", current sfis error: " << sfis_error / 127 << endl;
+            break;
+        }
+        last_turn_error = sfis_error;
 
         for (index_t i = 0; i < num_voxel; i++)
         {
@@ -352,7 +362,7 @@ void Model::local_min_search()
         }
         for (index_t i = 0; i < num_voxel; i++)
         {
-            if (voxels[i].bound ^ 0b00111111)
+            if (voxels[i].bound ^ BOUND)
             {
                 if (voxels[i].bound != 0)
                 {
@@ -425,7 +435,6 @@ void Model::visual_hull() const
             if (some_positive && some_negative)
             {
                 voxels[i].test = true;
-                voxels[i].bound = true;
                 break;
             }
         }
@@ -477,7 +486,7 @@ void Model::convert_polygon_mesh(vector<Vertex> &_vertices, vector<Triangle> &_t
         {
             for (index_t index_y = 0; index_y < y; index_y++, voxel_index++)
             {
-                if (voxels[voxel_index].occupied && voxels[voxel_index].bound < 0b00111111)
+                if (voxels[voxel_index].occupied && voxels[voxel_index].bound < BOUND)
                 {
                     num_hull++;
                     index_t v_0 = (index_z * vx + index_x) * vy + index_y;
@@ -725,16 +734,6 @@ void Model::convert_polygon_mesh(vector<Vertex> &_vertices, vector<Triangle> &_t
     //    iodata::write_contour_2d_points(image);
 }
 
-bool Model::is_bound(index_t index) const
-{
-    index_t index_xy = index % (x * y);
-    index_t index_z = index / (x * y);
-    return (index_xy / y == x - 1) || (!voxels[index + y].occupied) || (index_xy / y == 0) ||
-           (!voxels[index - y].occupied) || (index_xy % y == 0) || (!voxels[index - 1].occupied) ||
-           (index_xy % y == y - 1) || (!voxels[index + 1].occupied) || (index_z == z - 1) ||
-           (!voxels[index + x * y].occupied) || (index_z == 0) || (!voxels[index - x * y].occupied);
-}
-
 void Model::update_bound(index_t index) const
 {
     index_t index_xy = index % (x * y);
@@ -894,12 +893,10 @@ void Model::draw_triangle(const Vertex &v_0, const Vertex &v_1, const Vertex &v_
     }
 }
 
-void Model::draw_circle(const Vertex &v) const
+void Model::draw_circle(const float4 &c) const
 {
     int camera_order = 0;
     num_triangle++;
-
-    float4 c = v.world + float4(voxel_radius, voxel_radius, voxel_radius, 0);
 
     for (const auto &camera: *uniform->cameras)
     {
@@ -994,9 +991,29 @@ void Model::write_projection(const string &directory) const
 {
     Image image = Image(uniform->refer_image->x, uniform->refer_image->y, uniform->refer_image->num_camera);
 
-    for (index_t i = 0; i < uniform->num_pixel; i++)
+//    for (index_t i = 0; i < uniform->num_pixel; i++)
+//    {
+//        image.data[i] = occupied_config[i] > 0 ? 255 : 0;
+//    }
+    for (index_t i = 0; i < num_voxel; i++)
     {
-        image.data[i] = occupied_config[i] > 0 ? 255 : 0;
+        if (voxels[i].occupied)
+        {
+            uint64_t start_index = terms_array->indices[i];
+            uint64_t end_index = terms_array->indices[i + 1];
+            index_t buffer_index = start_index / terms_array->term_buffer_size;
+            index_t term_index = start_index % terms_array->term_buffer_size;
+            for (; start_index != end_index; start_index++, term_index++)
+            {
+                if (term_index == terms_array->term_buffer_size)
+                {
+                    term_index = 0;
+                    buffer_index++;
+                }
+                index_t index = terms_array->terms[buffer_index][term_index];
+                image.data[index] = 255;
+            }
+        }
     }
     iodata::write_projection(directory, image);
 }

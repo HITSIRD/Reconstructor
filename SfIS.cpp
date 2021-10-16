@@ -104,7 +104,7 @@ void SfIS::render_normal()
     start_time = t0.tv_usec / 1000000.0;
     end_time = double(t1.tv_sec - t0.tv_sec) + double(t1.tv_usec) / 1000000.0;
     cost = end_time - start_time;
-    cout << "local minimm search cost time: " << cost << " s" << endl;
+    cout << "local minimum search cost time: " << cost << " s" << endl;
 
     cout << "writing ply file..." << endl;
     gettimeofday(&t0, NULL);
@@ -192,7 +192,7 @@ void SfIS::render_correct()
         //        }
 
         gettimeofday(&t0, NULL);
-        model->back_projection(SfS::NORMAL);
+        model->back_projection(SfS::FAST);
         gettimeofday(&t1, NULL);
         start_time = t0.tv_usec / 1000000.0;
         end_time = double(t1.tv_sec - t0.tv_sec) + double(t1.tv_usec) / 1000000.0;
