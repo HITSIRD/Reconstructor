@@ -63,7 +63,7 @@ void TermsArray::increase_buffer()
 
 void TermsArray::reset()
 {
-    for (index_t i = 0; i < num_index + 1; i++)
+    for (index_t i = 0; i < num_index; i++)
     {
         indices[i] = 0;
     }
@@ -178,34 +178,32 @@ void Model::back_projection_normal()
         occupied_config[i] = 0;
     }
     terms_array->reset();
-    terms_array->indices[0] = 0;
-    int count = 0;
-    int32_t voxel_index = 0;
+    index_t voxel_index = 0;
 
     // rasterize every plane of voxel
     for (int index_z = 0; index_z < z; index_z++)
     {
         if (index_z % 10 == 0)
         {
-            cout << "count: " << count << ", term array size: " << terms_array->num_terms << endl;
+            cout << "count: " << voxel_index << ", term array size: " << terms_array->num_terms << endl;
         }
 
         for (int index_x = 0; index_x < x; index_x++)
         {
             for (int index_y = 0; index_y < y; index_y++, voxel_index++)
             {
-                uint32_t index_0 = (index_z * vx + index_x) * vy + index_y;
-                uint32_t index_2 = index_0 + vy;
-                uint32_t index_4 = index_0 + vx * vy;
-                uint32_t index_6 = index_4 + vy;
-                Vertex &v_0 = vertices[index_0];
-                Vertex &v_1 = vertices[index_0 + 1];
-                Vertex &v_2 = vertices[index_2];
-                Vertex &v_3 = vertices[index_2 + 1];
-                Vertex &v_4 = vertices[index_4];
-                Vertex &v_5 = vertices[index_4 + 1];
-                Vertex &v_6 = vertices[index_6];
-                Vertex &v_7 = vertices[index_6 + 1];
+                index_t index_0 = (index_z * vx + index_x) * vy + index_y;
+                index_t index_2 = index_0 + vy;
+                index_t index_4 = index_0 + vx * vy;
+                index_t index_6 = index_4 + vy;
+                const Vertex &v_0 = vertices[index_0];
+                const Vertex &v_1 = vertices[index_0 + 1];
+                const Vertex &v_2 = vertices[index_2];
+                const Vertex &v_3 = vertices[index_2 + 1];
+                const Vertex &v_4 = vertices[index_4];
+                const Vertex &v_5 = vertices[index_4 + 1];
+                const Vertex &v_6 = vertices[index_6];
+                const Vertex &v_7 = vertices[index_6 + 1];
 
                 // top
                 draw_triangle(v_4, v_6, v_5);
@@ -227,7 +225,6 @@ void Model::back_projection_normal()
                 draw_triangle(v_5, v_3, v_1);
 
                 terms_array->indices[voxel_index + 1] = terms_array->num_terms; // record index
-                count++;
             }
         }
     }
@@ -235,22 +232,20 @@ void Model::back_projection_normal()
     cout << "term array size: " << terms_array->num_terms << endl;
 }
 
-void Model::back_projection_fast()
+void Model::back_projection_fast() const
 {
     for (index_t i = 0; i < uniform->num_pixel; i++)
     {
         occupied_config[i] = 0;
     }
     terms_array->reset();
-    terms_array->indices[0] = 0;
-    int count = 0;
-    int32_t voxel_index = 0;
+    index_t voxel_index = 0;
 
     for (int index_z = 0; index_z < z; index_z++)
     {
         if (index_z % 10 == 0)
         {
-            cout << "count: " << count << ", term array size: " << terms_array->num_terms << endl;
+            cout << "count: " << voxel_index << ", term array size: " << terms_array->num_terms << endl;
         }
 
         for (int index_x = 0; index_x < x; index_x++)
@@ -260,7 +255,6 @@ void Model::back_projection_fast()
                 index_t index = (index_z * vx + index_x) * vy + index_y;
                 draw_circle(vertices[index].world + float4(voxel_radius, voxel_radius, voxel_radius, 0));
                 terms_array->indices[voxel_index + 1] = terms_array->num_terms; // record index
-                count++;
             }
         }
     }
@@ -290,7 +284,18 @@ void Model::local_min_search()
     cout << "number to test is " << num_to_test << endl;
     cout << "number of occupied is " << num_occupied << endl;
 
-    error_t last_turn_error = sfis_error;
+    //    error_t last_turn_error = sfis_error;
+    //    index_t voxel_index = 504407;
+
+    //    auto *rand_index = new index_t[num_voxel];
+    //    for (index_t i = 0; i < num_voxel; i++)
+    //    {
+    //        rand_index[i] = i;
+    //    }
+    //    for (int i = 0; i < num_voxel; i++)
+    //    {
+    //        swap(rand_index[i], rand_index[random() % i]);
+    //    }
 
     while (true)
     {
@@ -299,16 +304,27 @@ void Model::local_min_search()
         label_changed = 0;
         turn++;
 
+        int count = 0;
         for (index_t i = 0; i < num_voxel; i++)
         {
+            //            if(i == voxel_index)
+            //            {
+            //                cout << voxels[voxel_index].test << endl;
+            //            }
+
+            //            index_t i = rand_index[index]; // random searching
             if (voxels[i].test)
             {
-                int64_t partial = calculate_partial(i);
-                bool condition_0 = partial <= 0 && voxels[i].occupied;
-                bool condition_1 = partial > 0 && (!voxels[i].occupied);
+                error_t partial = calculate_partial(i);
+                //                if(i == voxel_index)
+                //                {
+                //                    cout << "occupied: " << voxels[voxel_index].occupied << endl;
+                //                    cout << "occupied: " << partial << endl;
+                //                }
+                bool condition_0 = partial < 0 && voxels[i].occupied;
+                bool condition_1 = partial >= 0 && (!voxels[i].occupied);
                 if (condition_0 || condition_1)
                 {
-                    label_changed++;
                     uint64_t start_index = terms_array->indices[i];
                     uint64_t end_index = terms_array->indices[i + 1];
                     index_t buffer_index = start_index / terms_array->term_buffer_size;
@@ -328,6 +344,7 @@ void Model::local_min_search()
                             index_t index = terms_array->terms[buffer_index][term_index];
                             occupied_config[index]--;
                         }
+                        //                            update_bound_with_neighbors(i);
                     } else
                     {
                         voxels[i].occupied = true;
@@ -342,19 +359,27 @@ void Model::local_min_search()
                             index_t index = terms_array->terms[buffer_index][term_index];
                             occupied_config[index]++;
                         }
+                        //                            update_bound_with_neighbors(i);
                     }
 
+                    label_changed++;
                     sfis_error -= abs(partial);
                 }
             }
         }
 
-        if (last_turn_error <= sfis_error)
+        //        cout << "pixel_521562: " << occupied_config[521562] << endl;
+        //        if (last_turn_error <= sfis_error)
+        //        {
+        //            cout << "label changed: " << label_changed << ", current sfis error: " << sfis_error / 127 << endl;
+        //            break;
+        //        }
+        //        last_turn_error = sfis_error;
+        if (label_changed == 0)
         {
             cout << "label changed: " << label_changed << ", current sfis error: " << sfis_error / 127 << endl;
             break;
         }
-        last_turn_error = sfis_error;
 
         for (index_t i = 0; i < num_voxel; i++)
         {
@@ -371,7 +396,7 @@ void Model::local_min_search()
                         num_to_test++;
                     }
                     voxels[i].test = true;
-                } else // single voxel which without neighbors, make it not be tested
+                } else // single voxel which is without neighbors, make it not be tested
                 {
                     if (!voxels[i].occupied)
                     {
@@ -380,7 +405,7 @@ void Model::local_min_search()
                             num_to_test--;
                         }
                         voxels[i].test = false;
-                    } else
+                    } else // should test if is occupied
                     {
                         if (!voxels[i].test)
                         {
@@ -400,6 +425,74 @@ void Model::local_min_search()
         }
         cout << "label changed: " << label_changed << ", current sfis error: " << sfis_error / 127 << endl;
     }
+
+    //    cout << "fill..." << endl;
+    //    int count = 0;
+    //    for (index_t t = 0; t < num_voxel; t++)
+    //    {
+    //        if (calculate_partial(t) == 0 && !voxels[t].occupied)
+    //        {
+    //            voxels[t].occupied = true;
+    //        }
+    //    }
+
+    //    int change = 1;
+    //    turn = 0;
+    //    while (change != 0)
+    //    {
+    //        change = 0;
+    //        turn++;
+    //
+    //        for (index_t i = 0; i < num_voxel; i++)
+    //        {
+    //            update_bound(i);
+    //        }
+    //        for (index_t t = 0; t < num_voxel; t++)
+    //        {
+    //            if (!voxels[t].occupied)
+    //            {
+    //                int b = (voxels[t].bound & FRONT) > 0;
+    //                b += (voxels[t].bound & BACK) > 0;
+    //                b += (voxels[t].bound & LEFT) > 0;
+    //                b += (voxels[t].bound & RIGHT) > 0;
+    //                b += (voxels[t].bound & TOP) > 0;
+    //                b += (voxels[t].bound & BOTTOM) > 0;
+    //                if (b >= 5)
+    //                {
+    //                    voxels[t].occupied = true;
+    //                    change++;
+    //                }
+    //            }
+    //        }
+    //        cout << "turn " << turn << ": " << change << endl;
+    //    }
+    //    cout << count << endl;
+
+    //    uint64_t start_index = terms_array->indices[voxel_index];
+    //    uint64_t end_index = terms_array->indices[voxel_index + 1];
+    //    index_t buffer_index = start_index / terms_array->term_buffer_size;
+    //    index_t term_index = start_index % terms_array->term_buffer_size;
+    //
+    //    error_t partial = 0;
+    //    cout << start_index << endl;
+    //    cout << end_index << endl;
+    //    for (; start_index != end_index; start_index++, term_index++)
+    //    {
+    //        if (term_index == terms_array->term_buffer_size)
+    //        {
+    //            term_index = 0;
+    //            buffer_index++;
+    //        }
+    //        index_t index = terms_array->terms[buffer_index][term_index];
+    //
+    //        cout << occupied_config[index] << endl;
+    //        if ((!voxels[voxel_index].occupied && occupied_config[index] == 0) ||
+    //            (voxels[voxel_index].occupied && occupied_config[index] == 1))
+    //        {
+    //            cout << uniform->refer_image->coefficients[index] << endl;
+    //            partial += uniform->refer_image->coefficients[index];
+    //        }
+    //    }
 }
 
 void Model::visual_hull() const
@@ -466,6 +559,28 @@ void Model::visual_hull() const
     {
         update_bound(i);
     }
+    //    for (index_t i = 0; i < num_voxel; i++)
+    //    {
+    //        if (voxels[i].bound ^ BOUND)
+    //        {
+    //            if (voxels[i].bound != 0)
+    //            {
+    //                voxels[i].test = true;
+    //            } else // single voxel which without neighbors, make it not be tested
+    //            {
+    //                if (!voxels[i].occupied)
+    //                {
+    //                    voxels[i].test = false;
+    //                } else
+    //                {
+    //                    voxels[i].test = true;
+    //                }
+    //            }
+    //        } else
+    //        {
+    //            voxels[i].test = false;
+    //        }
+    //    }
 }
 
 void Model::convert_polygon_mesh(vector<Vertex> &_vertices, vector<Triangle> &_triangles) const
@@ -479,6 +594,12 @@ void Model::convert_polygon_mesh(vector<Vertex> &_vertices, vector<Triangle> &_t
     index_t voxel_index = 0;
     int32_t current_index = 0;
     vector<index_t> vertex_index;
+
+    // update bound information
+    for (index_t i = 0; i < num_voxel; i++)
+    {
+        update_bound(i);
+    }
 
     for (index_t index_z = 0; index_z < z; index_z++)
     {
@@ -738,47 +859,83 @@ void Model::update_bound(index_t index) const
 {
     index_t index_xy = index % (x * y);
     index_t index_z = index / (x * y);
-    if (index_xy / y == x - 1 || voxels[index + y].occupied)
-    {
-        voxels[index].bound |= FRONT;
-    } else
+    if (index_xy / y == x - 1)
     {
         voxels[index].bound &= MASK_FRONT;
-    }
-    if (index_xy / y == 0 || voxels[index - y].occupied)
-    {
-        voxels[index].bound |= BACK;
     } else
+    {
+        if (voxels[index + y].occupied)
+        {
+            voxels[index].bound |= FRONT;
+        } else
+        {
+            voxels[index].bound &= MASK_FRONT;
+        }
+    }
+    if (index_xy / y == 0)
     {
         voxels[index].bound &= MASK_BACK;
-    }
-    if (index_xy % y == 0 || voxels[index - 1].occupied)
-    {
-        voxels[index].bound |= LEFT;
     } else
+    {
+        if (voxels[index - y].occupied)
+        {
+            voxels[index].bound |= BACK;
+        } else
+        {
+            voxels[index].bound &= MASK_BACK;
+        }
+    }
+    if (index_xy % y == 0)
     {
         voxels[index].bound &= MASK_LEFT;
-    }
-    if (index_xy % y == y - 1 || voxels[index + 1].occupied)
-    {
-        voxels[index].bound |= RIGHT;
     } else
+    {
+        if (voxels[index - 1].occupied)
+        {
+            voxels[index].bound |= LEFT;
+        } else
+        {
+            voxels[index].bound &= MASK_LEFT;
+        }
+    }
+    if (index_xy % y == y - 1)
     {
         voxels[index].bound &= MASK_RIGHT;
-    }
-    if (index_z == z - 1 || voxels[index + x * y].occupied)
-    {
-        voxels[index].bound |= TOP;
     } else
+    {
+        if (voxels[index + 1].occupied)
+        {
+            voxels[index].bound |= RIGHT;
+        } else
+        {
+            voxels[index].bound &= MASK_RIGHT;
+        }
+    }
+    if (index_z == z - 1)
     {
         voxels[index].bound &= MASK_TOP;
-    }
-    if (index_z == 0 || voxels[index - x * y].occupied)
-    {
-        voxels[index].bound |= BOTTOM;
     } else
     {
+        if (voxels[index + x * y].occupied)
+        {
+            voxels[index].bound |= TOP;
+        } else
+        {
+            voxels[index].bound &= MASK_TOP;
+        }
+    }
+    if (index_z == 0)
+    {
         voxels[index].bound &= MASK_BOTTOM;
+    } else
+    {
+        if (voxels[index - x * y].occupied)
+        {
+            voxels[index].bound |= BOTTOM;
+        } else
+        {
+            voxels[index].bound &= MASK_BOTTOM;
+        }
     }
 }
 
@@ -968,19 +1125,38 @@ error_t Model::calculate_partial(index_t voxel_index) const
     index_t term_index = start_index % terms_array->term_buffer_size;
 
     error_t partial = 0;
-    for (; start_index != end_index; start_index++, term_index++)
-    {
-        if (term_index == terms_array->term_buffer_size)
-        {
-            term_index = 0;
-            buffer_index++;
-        }
-        index_t index = terms_array->terms[buffer_index][term_index];
 
-        if ((!voxels[voxel_index].occupied && occupied_config[index] == 0) ||
-            (voxels[voxel_index].occupied && occupied_config[index] == 1))
+    if (voxels[voxel_index].occupied)
+    {
+        for (; start_index != end_index; start_index++, term_index++)
         {
-            partial += uniform->refer_image->coefficients[index];
+            if (term_index == terms_array->term_buffer_size)
+            {
+                term_index = 0;
+                buffer_index++;
+            }
+            index_t index = terms_array->terms[buffer_index][term_index];
+
+            if (occupied_config[index] == 1)
+            {
+                partial += uniform->refer_image->coefficients[index];
+            }
+        }
+    } else
+    {
+        for (; start_index != end_index; start_index++, term_index++)
+        {
+            if (term_index == terms_array->term_buffer_size)
+            {
+                term_index = 0;
+                buffer_index++;
+            }
+            index_t index = terms_array->terms[buffer_index][term_index];
+
+            if (occupied_config[index] == 0)
+            {
+                partial += uniform->refer_image->coefficients[index];
+            }
         }
     }
 
@@ -991,10 +1167,10 @@ void Model::write_projection(const string &directory) const
 {
     Image image = Image(uniform->refer_image->x, uniform->refer_image->y, uniform->refer_image->num_camera);
 
-//    for (index_t i = 0; i < uniform->num_pixel; i++)
-//    {
-//        image.data[i] = occupied_config[i] > 0 ? 255 : 0;
-//    }
+    //    for (index_t i = 0; i < uniform->num_pixel; i++)
+    //    {
+    //        image.data[i] = occupied_config[i] > 0 ? 255 : 0;
+    //    }
     for (index_t i = 0; i < num_voxel; i++)
     {
         if (voxels[i].occupied)

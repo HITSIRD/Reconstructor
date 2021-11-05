@@ -12,7 +12,7 @@ class Voxel
 public:
     bool occupied;
     bool test;
-    uint8_t bound; // 0x00000000: 0x00 0(F) 0(B) 0(L) 0(R) 0(T) 0(B), 1 means neighbor is occupied
+    uint8_t bound; // 0x00000000: 0x00 0(BOTTOM) 0(TOP) 0(RIGHT) 0(LEFT) 0(BACK) 0(FRONT), 1 means neighbor is occupied
 
     Voxel():occupied(true), test(false), bound(0){}
 

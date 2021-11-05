@@ -115,7 +115,7 @@ void SfIS::render_normal()
     cost = end_time - start_time;
     cout << "write model cost time: " << cost << " s" << endl;
 
-    cout << "writing sie comprision..." << endl;
+    cout << "writing sie comparison..." << endl;
     model->write_sie(directory);
 //    model->write_projection(directory);
 

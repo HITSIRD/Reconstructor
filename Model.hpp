@@ -14,27 +14,6 @@
 
 namespace SfS
 {
-    enum DirectionType
-    {
-        FRONT = 0b00000001,
-        BACK = 0b00000010,
-        LEFT = 0b00000100,
-        RIGHT = 0b00001000,
-        TOP = 0b00010000,
-        BOTTOM = 0b00100000
-    };
-
-    enum DirectionMask
-    {
-        MASK_FRONT = 0b00111110,
-        MASK_BACK = 0b00111101,
-        MASK_LEFT = 0b00111011,
-        MASK_RIGHT = 0b00110111,
-        MASK_TOP = 0b00101111,
-        MASK_BOTTOM = 0b00011111,
-        BOUND = 0b00111111
-    };
-
     enum ProjectionMode
     {
         NORMAL, FAST
@@ -84,10 +63,10 @@ public:
 class TermsArray
 {
 public:
-    const index_t term_buffer_size = 1 << 27;
+    const index_t term_buffer_size = 1 << 28; // 256 MB
     uint64_t capacity;
     uint64_t num_terms;
-    index_t num_index; // number of index in indices
+    index_t num_index; // number of index in indices, num_index = num_voxel + 1
     uint64_t *indices; // to slice terms of each voxel
     std::vector<index_t *> terms; // back projection pixels index of each voxel
 
@@ -228,13 +207,19 @@ private:
     /**
      *
      */
-    void back_projection_fast();
+    void back_projection_fast() const;
 
     /**
      *
      * @param index
      */
     void update_bound(index_t index) const;
+
+    /**
+     *
+     * @param index
+     */
+    void update_bound_with_neighbors(index_t index) const;
 
     /**
      *
