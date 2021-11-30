@@ -36,4 +36,3 @@ target_link_libraries(Reconstructor ${OpenCV_LIBRARIES})
 target_link_libraries(Reconstructor /opt/homebrew/Cellar/ceres-solver/2.0.0_4/lib/libceres.dylib)
 target_link_libraries(Reconstructor /opt/homebrew/Cellar/gflags/2.2.2/lib/libgflags.dylib)
 target_link_libraries(Reconstructor /opt/homebrew/Cellar/glog/0.5.0/lib/libglog.dylib)
-

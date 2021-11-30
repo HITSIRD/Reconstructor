@@ -35,7 +35,7 @@ public:
     Image *refer_image;
 
     BoundingBox bounding_box;
-    float initial_voxel_size;
+    float expected_voxel_size;
 
     /**
      *
@@ -62,6 +62,13 @@ public:
      */
     void calculate_refer_contours();
 
+    /**
+     *
+     * @param model
+     * @param voxel_size
+     * @return
+     */
+    Model *split_from_model(Model *model, float voxel_size);
 private:
     /**
      *
@@ -75,17 +82,8 @@ private:
 
     /**
      *
-     * @param model
      */
-    void generate_child_grid(Model *model);
-
-    /**
-     *
-     * @param parent
-     * @param child
-     * @param distance
-     */
-    void propagate_label_to_child(Model *parent, Model *child, float distance);
+    void render_hierarchy();
 };
 
 #endif //RECONSTRUCTER_SFIS_HPP

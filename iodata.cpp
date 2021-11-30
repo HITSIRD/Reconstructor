@@ -126,7 +126,7 @@ void iodata::read_config(const string &voxel_config, const string &config, SfIS 
     in >> term;
     if (term == "VOXEL_SIZE")
     {
-        in >> sfis.initial_voxel_size;
+        in >> sfis.expected_voxel_size;
     } else
     {
         cerr << "FILE FORMAT ERROR" << endl;
@@ -280,27 +280,25 @@ void iodata::write_test(const string &directory, const Image &image)
     }
 }
 
-void iodata::write_sie(const string &directory, Image &image, Image &refer)
+void iodata::write_sie(const string &directory, const Image &image, const Image &refer)
 {
     string equation = "\"";
     string command = "mkdir -p " + equation + directory + "/sie" + equation;
     system(command.c_str());
     stringstream ss;
     string number;
+    cv::Mat img = cv::Mat(image.y, image.x, CV_8UC3);
+    int size = image.x * image.y;
+
     for (int i = 0; i < image.num_camera; i++)
     {
         ss.clear();
         ss << setw(4) << setfill('0') << i;
         ss >> number;
         string file_name = directory + "/sie/img_" + number + ".png";
-        cv::Mat img = cv::Mat(image.y, image.x, CV_8UC3);
 
-        int size = image.x * image.y;
-        int offset = i * size;
-
-        auto *p = (uint8_t *)img.data;
-
-        int index = offset;
+        int index = i * size;
+        auto *p = img.data;
         for (int j = 0; j < size; j++, index++)
         {
             if (image.data[index] > 0 && refer.coefficients[index] > 0)

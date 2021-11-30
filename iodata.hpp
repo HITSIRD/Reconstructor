@@ -59,7 +59,7 @@ public:
      * @param directory working directory
      * @param image
      */
-    static void write_sie(const std::string &directory, Image &image, Image &refer);
+    static void write_sie(const std::string &directory, const Image &image, const Image &refer);
 
     /**
      *

@@ -18,10 +18,10 @@ SfIS::SfIS(const string &voxel_config, const string &config)
 
 SfIS::~SfIS()
 {
-    for (auto model: models)
-    {
-        delete model;
-    }
+//    for (auto model: models)
+//    {
+//        delete model;
+//    }
     for (auto camera: cameras)
     {
         delete camera;
@@ -30,7 +30,7 @@ SfIS::~SfIS()
 
 void SfIS::read_config(const string &config_file)
 {
-    iodata::read_config(config_file, cameras, refer_image, bounding_box, initial_voxel_size, iteration);
+    iodata::read_config(config_file, cameras, refer_image, bounding_box, expected_voxel_size, iteration);
 }
 
 void SfIS::render(SfS::MODE mode)
@@ -39,7 +39,8 @@ void SfIS::render(SfS::MODE mode)
     {
         case SfS::NO_CORRECTION:
             cout << "mode: NO_CORRECTION" << endl;
-            render_normal();
+            //            render_normal();
+            render_hierarchy();
             break;
         case SfS::CORRECTION:
             cout << "mode: CORRECTION" << endl;
@@ -54,10 +55,10 @@ void SfIS::render_normal()
     double start_time, end_time, cost;
 
     gettimeofday(&start, NULL);
-    Model *model = new Model((unsigned int)(bounding_box.bounding_box_size.x() / initial_voxel_size),
-                             (unsigned int)(bounding_box.bounding_box_size.y() / initial_voxel_size),
-                             (unsigned int)(bounding_box.bounding_box_size.z() / initial_voxel_size),
-                             bounding_box.min_point, initial_voxel_size);
+    Model *model = new Model((index_t)(bounding_box.bounding_box_size.x() / expected_voxel_size),
+                             (index_t)(bounding_box.bounding_box_size.y() / expected_voxel_size),
+                             (index_t)(bounding_box.bounding_box_size.z() / expected_voxel_size),
+                             bounding_box.min_point, expected_voxel_size);
     models.push_back(model);
 
     // clear and create working directory
@@ -73,10 +74,9 @@ void SfIS::render_normal()
     uniform->set_refer_image(refer_image);
     model->set_uniform(uniform);
     model->initialize();
-    calculate_refer_contours();
 
     cout << "model size[x, y, z]: [" << model->x << ", " << model->y << ", " << model->z << "]" << endl;
-    cout << "initial voxel size: " << initial_voxel_size << endl;
+    cout << "current voxel size: " << expected_voxel_size << endl;
     cout << "voxel number: " << model->num_voxel << endl;
     cout << "pixel number: " << uniform->num_pixel << endl;
     cout << "bounding box: [" << bounding_box.min_point.x() << ", " << bounding_box.min_point.y() << ", "
@@ -84,7 +84,7 @@ void SfIS::render_normal()
     cout << bounding_box.max_point.x() << ", " << bounding_box.max_point.y() << ", " << bounding_box.max_point.x()
          << "]" << endl;
     cout << "iteration: " << iteration << endl;
-    cout << "expected voxel size: " << initial_voxel_size / (float)iteration << endl;
+    cout << "expected voxel size: " << expected_voxel_size << endl;
 
     gettimeofday(&t0, NULL);
     model->back_projection(SfS::FAST);
@@ -117,7 +117,7 @@ void SfIS::render_normal()
 
     cout << "writing sie comparison..." << endl;
     model->write_sie(directory);
-//    model->write_projection(directory);
+    //    model->write_projection(directory);
 
     gettimeofday(&end, NULL);
     start_time = t0.tv_usec / 1000000.0;
@@ -134,10 +134,10 @@ void SfIS::render_correct()
     double start_time, end_time, cost;
 
     gettimeofday(&start, NULL);
-    Model *model = new Model((unsigned int)(bounding_box.bounding_box_size.x() / initial_voxel_size),
-                             (unsigned int)(bounding_box.bounding_box_size.y() / initial_voxel_size),
-                             (unsigned int)(bounding_box.bounding_box_size.z() / initial_voxel_size),
-                             bounding_box.min_point, initial_voxel_size);
+    Model *model = new Model((index_t)(bounding_box.bounding_box_size.x() / expected_voxel_size),
+                             (index_t)(bounding_box.bounding_box_size.y() / expected_voxel_size),
+                             (index_t)(bounding_box.bounding_box_size.z() / expected_voxel_size),
+                             bounding_box.min_point, expected_voxel_size);
     models.push_back(model);
 
     // clear and create working directory
@@ -162,7 +162,7 @@ void SfIS::render_correct()
     calculate_refer_contours();
 
     cout << "model size[x, y, z]: [" << model->x << ", " << model->y << ", " << model->z << "]" << endl;
-    cout << "initial voxel size: " << initial_voxel_size << endl;
+    cout << "current voxel size: " << expected_voxel_size << endl;
     cout << "voxel number: " << model->num_voxel << endl;
     cout << "pixel number: " << uniform->num_pixel << endl;
     cout << "bounding box: [" << bounding_box.min_point.x() << ", " << bounding_box.min_point.y() << ", "
@@ -170,7 +170,7 @@ void SfIS::render_correct()
     cout << bounding_box.max_point.x() << ", " << bounding_box.max_point.y() << ", " << bounding_box.max_point.x()
          << "]" << endl;
     cout << "iteration: " << iteration << endl;
-    cout << "expected voxel size: " << initial_voxel_size / (float)iteration << endl;
+    cout << "expected voxel size: " << expected_voxel_size << endl;
     error_t last_turn_error = 1 << 30;
     int turn = 1;
 
@@ -253,6 +253,142 @@ void SfIS::render_correct()
     }
 }
 
+void SfIS::render_hierarchy()
+{
+    struct timeval start, end, t0, t1, total_start, total_end;
+    double start_time, end_time, cost;
+
+    gettimeofday(&total_start, NULL);
+    gettimeofday(&start, NULL);
+
+    float voxel_size = (float)(1 << iteration) * expected_voxel_size;
+    Model *model = new Model((index_t)(bounding_box.bounding_box_size.x() / voxel_size),
+                             (index_t)(bounding_box.bounding_box_size.y() / voxel_size),
+                             (index_t)(bounding_box.bounding_box_size.z() / voxel_size), bounding_box.min_point,
+                             voxel_size);
+    models.push_back(model);
+
+    // clear and create working directory
+    string directory = "Data/Model_S" + to_string<float>(expected_voxel_size) + "_I" + to_string<int>(iteration);
+    string equation = "\"";
+    string command = "rm -r " + equation + directory + equation;
+    system(command.c_str());
+    command = "mkdir -p " + equation + directory + equation;
+    system(command.c_str());
+
+    Uniform *uniform = new Uniform(refer_image->num_camera * refer_image->x * refer_image->y);
+    uniform->set_cameras(&cameras);
+    uniform->set_refer_image(refer_image);
+    model->set_uniform(uniform);
+    model->initialize();
+
+    cout << "model size[x, y, z]: [" << model->x << ", " << model->y << ", " << model->z << "]" << endl;
+    cout << "current voxel size: " << voxel_size << endl;
+    cout << "voxel number: " << model->num_voxel << endl;
+    cout << "pixel number: " << uniform->num_pixel << endl;
+    cout << "bounding box: [" << bounding_box.min_point.x() << ", " << bounding_box.min_point.y() << ", "
+         << bounding_box.min_point.z() << "], [";
+    cout << bounding_box.max_point.x() << ", " << bounding_box.max_point.y() << ", " << bounding_box.max_point.x()
+         << "]" << endl;
+    cout << "iteration: " << iteration << endl;
+    cout << "expected voxel size: " << expected_voxel_size / (float)iteration << endl;
+
+    gettimeofday(&t0, NULL);
+    model->back_projection(SfS::FAST);
+    gettimeofday(&t1, NULL);
+    start_time = t0.tv_usec / 1000000.0;
+    end_time = double(t1.tv_sec - t0.tv_sec) + double(t1.tv_usec) / 1000000.0;
+    cost = end_time - start_time;
+    cout << "back projection cost time: " << cost << " s" << endl;
+
+    model->visual_hull();
+    model->calculate_error();
+    cout << "sfis error: " << model->sfis_error / 127 << endl;
+
+    gettimeofday(&t0, NULL);
+    model->local_min_search();
+    gettimeofday(&t1, NULL);
+    start_time = t0.tv_usec / 1000000.0;
+    end_time = double(t1.tv_sec - t0.tv_sec) + double(t1.tv_usec) / 1000000.0;
+    cost = end_time - start_time;
+    cout << "local minimum search cost time: " << cost << " s" << endl;
+
+    model->terms_array->reset();
+
+    gettimeofday(&end, NULL);
+    start_time = t0.tv_usec / 1000000.0;
+    end_time = double(end.tv_sec - start.tv_sec) + double(end.tv_usec) / 1000000.0;
+    cost = end_time - start_time;
+    cout << "total cost time: " << cost << " s" << endl;
+
+    int iter = 0;
+    while (iter < iteration)
+    {
+        iter++;
+        cout << "split iteration " << iter << endl;
+
+        gettimeofday(&start, NULL);
+
+        voxel_size = (float)(1 << (iteration - iter)) * expected_voxel_size;
+        models[iter - 1]->cut(); // cut
+        Model *split_model = split_from_model(models[iter - 1], voxel_size);
+        delete models[iter - 1];
+        models.push_back(split_model);
+
+        split_model->set_uniform(uniform);
+        split_model->initialize();
+
+        cout << "model size[x, y, z]: [" << split_model->x << ", " << split_model->y << ", " << split_model->z << "]"
+             << endl;
+        cout << "current voxel size: " << voxel_size << endl;
+        cout << "voxel number: " << split_model->num_voxel << endl;
+        cout << "expected voxel size: " << expected_voxel_size << endl;
+
+        gettimeofday(&t0, NULL);
+        split_model->back_projection(SfS::FAST);
+        gettimeofday(&t1, NULL);
+        start_time = t0.tv_usec / 1000000.0;
+        end_time = double(t1.tv_sec - t0.tv_sec) + double(t1.tv_usec) / 1000000.0;
+        cost = end_time - start_time;
+        cout << "back projection cost time: " << cost << " s" << endl;
+
+        split_model->calculate_error();
+        cout << "sfis error: " << split_model->sfis_error / 127 << endl;
+
+        gettimeofday(&t0, NULL);
+        split_model->local_min_search();
+        gettimeofday(&t1, NULL);
+        start_time = t0.tv_usec / 1000000.0;
+        end_time = double(t1.tv_sec - t0.tv_sec) + double(t1.tv_usec) / 1000000.0;
+        cost = end_time - start_time;
+        cout << "local minimum search cost time: " << cost << " s" << endl;
+
+        gettimeofday(&end, NULL);
+        start_time = t0.tv_usec / 1000000.0;
+        end_time = double(end.tv_sec - start.tv_sec) + double(end.tv_usec) / 1000000.0;
+        cost = end_time - start_time;
+        cout << "iter " << iter << " cost time: " << cost << " s" << endl;
+    }
+    cout << "writing ply file..." << endl;
+    gettimeofday(&t0, NULL);
+    iodata::write_ply(directory, models[iteration]);
+    gettimeofday(&t1, NULL);
+    start_time = t0.tv_usec / 1000000.0;
+    end_time = double(t1.tv_sec - t0.tv_sec) + double(t1.tv_usec) / 1000000.0;
+    cost = end_time - start_time;
+    cout << "write model cost time: " << cost << " s" << endl;
+
+    gettimeofday(&total_end, NULL);
+    start_time = total_start.tv_usec / 1000000.0;
+    end_time = double(total_end.tv_sec - total_start.tv_sec) + double(total_end.tv_usec) / 1000000.0;
+    cost = end_time - start_time;
+    cout << "total cost time: " << cost << " s" << endl;
+
+    cout << "writing sie comparison..." << endl;
+    models[iteration]->write_sie(directory);
+    //    model->write_projection(directory);
+}
+
 void SfIS::calculate_refer_contours()
 {
     // get reference
@@ -286,7 +422,13 @@ void SfIS::calculate_refer_contours()
     //    iodata::write_refer_contours(*refer_image);
 }
 
-void SfIS::propagate_label_to_child(Model *parent, Model *child, float distance)
+Model *SfIS::split_from_model(Model *model, float voxel_size)
 {
+    Model *child = new Model((index_t)(bounding_box.bounding_box_size.x() / voxel_size),
+                             (index_t)(bounding_box.bounding_box_size.y() / voxel_size),
+                             (index_t)(bounding_box.bounding_box_size.z() / voxel_size), bounding_box.min_point,
+                             voxel_size);
 
+    model->propagate_labels(child);
+    return child;
 }

@@ -88,19 +88,13 @@ Model::Model(index_t _x, index_t _y, index_t _z, float3 origin, float _voxel_siz
     voxel_radius = voxel_size * 0.5f;
     voxels = new Voxel[num_voxel];
     sfis_error = 0;
-    false_positive = 0;
-    false_negative = 0;
+    //    false_positive = 0;
+    //    false_negative = 0;
 
     num_vertices = vx * vy * vz;
     vertices = new Vertex[num_vertices];
     terms_array = new TermsArray(num_voxel);
     index_t vertex_index = 0;
-
-    // update voxel bound attribute
-    for (index_t i = 0; i < num_voxel; i++)
-    {
-        update_bound(i);
-    }
 
     // calculate vertex coordinate
     for (index_t index_z = 0; index_z < vz; index_z++)
@@ -128,6 +122,12 @@ Model::~Model()
 void Model::initialize()
 {
     occupied_config = new index_t[uniform->num_pixel];
+
+    // update voxel bound attribute
+    for (index_t i = 0; i < num_voxel; i++)
+    {
+        update_bound(i);
+    }
 }
 
 void Model::set_uniform(Uniform *u)
@@ -144,8 +144,8 @@ void Model::reset()
         voxels[i].bound = 0;
     }
     //    sfis_error = 0;
-    false_positive = 0;
-    false_negative = 0;
+    //    false_positive = 0;
+    //    false_negative = 0;
 
     terms_array->reset();
     for (index_t i = 0; i < uniform->num_pixel; i++)
@@ -205,24 +205,26 @@ void Model::back_projection_normal()
                 const Vertex &v_6 = vertices[index_6];
                 const Vertex &v_7 = vertices[index_6 + 1];
 
+                bool occupied = voxels[voxel_index].occupied;
+
                 // top
-                draw_triangle(v_4, v_6, v_5);
-                draw_triangle(v_5, v_6, v_7);
+                draw_triangle(v_4, v_6, v_5, occupied);
+                draw_triangle(v_5, v_6, v_7, occupied);
                 // bottom
-                draw_triangle(v_0, v_1, v_2);
-                draw_triangle(v_2, v_1, v_3);
+                draw_triangle(v_0, v_1, v_2, occupied);
+                draw_triangle(v_2, v_1, v_3, occupied);
                 // front
-                draw_triangle(v_6, v_2, v_7);
-                draw_triangle(v_7, v_2, v_3);
+                draw_triangle(v_6, v_2, v_7, occupied);
+                draw_triangle(v_7, v_2, v_3, occupied);
                 // back
-                draw_triangle(v_4, v_5, v_0);
-                draw_triangle(v_5, v_1, v_0);
+                draw_triangle(v_4, v_5, v_0, occupied);
+                draw_triangle(v_5, v_1, v_0, occupied);
                 // left
-                draw_triangle(v_4, v_0, v_6);
-                draw_triangle(v_6, v_0, v_2);
+                draw_triangle(v_4, v_0, v_6, occupied);
+                draw_triangle(v_6, v_0, v_2, occupied);
                 // right
-                draw_triangle(v_7, v_3, v_5);
-                draw_triangle(v_5, v_3, v_1);
+                draw_triangle(v_7, v_3, v_5, occupied);
+                draw_triangle(v_5, v_3, v_1, occupied);
 
                 terms_array->indices[voxel_index + 1] = terms_array->num_terms; // record index
             }
@@ -253,7 +255,9 @@ void Model::back_projection_fast() const
             for (int index_y = 0; index_y < y; index_y++, voxel_index++)
             {
                 index_t index = (index_z * vx + index_x) * vy + index_y;
-                draw_circle(vertices[index].world + float4(voxel_radius, voxel_radius, voxel_radius, 0));
+                draw_circle(
+                        vertices[index].world + float4(voxel_radius, voxel_radius, voxel_radius, 0),
+                        voxels[voxel_index].occupied);
                 terms_array->indices[voxel_index + 1] = terms_array->num_terms; // record index
             }
         }
@@ -265,10 +269,41 @@ void Model::back_projection_fast() const
 void Model::local_min_search()
 {
     cout << "local minimum search..." << endl;
+    //    culling();
+    //    calculate_error();
+    //    cout << "sfis error: " << sfis_error / 127 << endl;
+
     int label_changed = 1;
     int num_to_test = 0;
     int num_occupied = 0;
     int turn = 1;
+
+    //    for (index_t i = 0; i < num_voxel; i++)
+    //    {
+    //        update_bound(i);
+    //    }
+    for (index_t i = 0; i < num_voxel; i++)
+    {
+        if (voxels[i].bound ^ BOUND)
+        {
+            if (voxels[i].bound != 0)
+            {
+                voxels[i].test = true;
+            } else // single voxel which without neighbors, make it not be tested
+            {
+                if (!voxels[i].occupied)
+                {
+                    voxels[i].test = false;
+                } else
+                {
+                    voxels[i].test = true;
+                }
+            }
+        } else
+        {
+            voxels[i].test = false;
+        }
+    }
 
     for (index_t i = 0; i < num_voxel; i++)
     {
@@ -284,19 +319,6 @@ void Model::local_min_search()
     cout << "number to test is " << num_to_test << endl;
     cout << "number of occupied is " << num_occupied << endl;
 
-    //    error_t last_turn_error = sfis_error;
-    //    index_t voxel_index = 504407;
-
-    //    auto *rand_index = new index_t[num_voxel];
-    //    for (index_t i = 0; i < num_voxel; i++)
-    //    {
-    //        rand_index[i] = i;
-    //    }
-    //    for (int i = 0; i < num_voxel; i++)
-    //    {
-    //        swap(rand_index[i], rand_index[random() % i]);
-    //    }
-
     while (true)
     {
         cout << "turn " << turn << ": number to test is " << num_to_test << ", " << "number of occupied is "
@@ -307,20 +329,9 @@ void Model::local_min_search()
         int count = 0;
         for (index_t i = 0; i < num_voxel; i++)
         {
-            //            if(i == voxel_index)
-            //            {
-            //                cout << voxels[voxel_index].test << endl;
-            //            }
-
-            //            index_t i = rand_index[index]; // random searching
             if (voxels[i].test)
             {
                 error_t partial = calculate_partial(i);
-                //                if(i == voxel_index)
-                //                {
-                //                    cout << "occupied: " << voxels[voxel_index].occupied << endl;
-                //                    cout << "occupied: " << partial << endl;
-                //                }
                 bool condition_0 = partial < 0 && voxels[i].occupied;
                 bool condition_1 = partial >= 0 && (!voxels[i].occupied);
                 if (condition_0 || condition_1)
@@ -344,7 +355,6 @@ void Model::local_min_search()
                             index_t index = terms_array->terms[buffer_index][term_index];
                             occupied_config[index]--;
                         }
-                        //                            update_bound_with_neighbors(i);
                     } else
                     {
                         voxels[i].occupied = true;
@@ -359,7 +369,6 @@ void Model::local_min_search()
                             index_t index = terms_array->terms[buffer_index][term_index];
                             occupied_config[index]++;
                         }
-                        //                            update_bound_with_neighbors(i);
                     }
 
                     label_changed++;
@@ -368,7 +377,6 @@ void Model::local_min_search()
             }
         }
 
-        //        cout << "pixel_521562: " << occupied_config[521562] << endl;
         //        if (last_turn_error <= sfis_error)
         //        {
         //            cout << "label changed: " << label_changed << ", current sfis error: " << sfis_error / 127 << endl;
@@ -427,31 +435,33 @@ void Model::local_min_search()
     }
 
     //    cout << "fill..." << endl;
-    //    int count = 0;
     //    for (index_t t = 0; t < num_voxel; t++)
     //    {
     //        if (calculate_partial(t) == 0 && !voxels[t].occupied)
     //        {
     //            voxels[t].occupied = true;
+    //            num_occupied++;
     //        }
     //    }
-
-    //    int change = 1;
+    //    cout << "occupied: " << num_occupied << endl;
+    //
     //    turn = 0;
+    //    int change = 1;
+    //    for (index_t i = 0; i < num_voxel; i++)
+    //    {
+    //        update_bound(i);
+    //    }
     //    while (change != 0)
     //    {
     //        change = 0;
     //        turn++;
     //
-    //        for (index_t i = 0; i < num_voxel; i++)
-    //        {
-    //            update_bound(i);
-    //        }
     //        for (index_t t = 0; t < num_voxel; t++)
     //        {
-    //            if (!voxels[t].occupied)
+    //            if (!voxels[t].occupied && voxels[t].bound > 0)
     //            {
-    //                int b = (voxels[t].bound & FRONT) > 0;
+    //                int b = 0;
+    //                b += (voxels[t].bound & FRONT) > 0;
     //                b += (voxels[t].bound & BACK) > 0;
     //                b += (voxels[t].bound & LEFT) > 0;
     //                b += (voxels[t].bound & RIGHT) > 0;
@@ -460,37 +470,18 @@ void Model::local_min_search()
     //                if (b >= 5)
     //                {
     //                    voxels[t].occupied = true;
+    //                    num_occupied++;
     //                    change++;
     //                }
     //            }
     //        }
-    //        cout << "turn " << turn << ": " << change << endl;
-    //    }
-    //    cout << count << endl;
-
-    //    uint64_t start_index = terms_array->indices[voxel_index];
-    //    uint64_t end_index = terms_array->indices[voxel_index + 1];
-    //    index_t buffer_index = start_index / terms_array->term_buffer_size;
-    //    index_t term_index = start_index % terms_array->term_buffer_size;
     //
-    //    error_t partial = 0;
-    //    cout << start_index << endl;
-    //    cout << end_index << endl;
-    //    for (; start_index != end_index; start_index++, term_index++)
-    //    {
-    //        if (term_index == terms_array->term_buffer_size)
-    //        {
-    //            term_index = 0;
-    //            buffer_index++;
-    //        }
-    //        index_t index = terms_array->terms[buffer_index][term_index];
+    //        cout << "turn " << turn << ": " << change << ", occupied: " << num_occupied << endl;
     //
-    //        cout << occupied_config[index] << endl;
-    //        if ((!voxels[voxel_index].occupied && occupied_config[index] == 0) ||
-    //            (voxels[voxel_index].occupied && occupied_config[index] == 1))
+    //        // update
+    //        for (index_t i = 0; i < num_voxel; i++)
     //        {
-    //            cout << uniform->refer_image->coefficients[index] << endl;
-    //            partial += uniform->refer_image->coefficients[index];
+    //            update_bound(i);
     //        }
     //    }
 }
@@ -555,10 +546,10 @@ void Model::visual_hull() const
     }
 
     // update
-    for (index_t i = 0; i < num_voxel; i++)
-    {
-        update_bound(i);
-    }
+    //    for (index_t i = 0; i < num_voxel; i++)
+    //    {
+    //        update_bound(i);
+    //    }
     //    for (index_t i = 0; i < num_voxel; i++)
     //    {
     //        if (voxels[i].bound ^ BOUND)
@@ -583,16 +574,137 @@ void Model::visual_hull() const
     //    }
 }
 
+void Model::culling()
+{
+    cout << "culling..." << endl;
+
+    index_t image_size = uniform->refer_image->x * uniform->refer_image->y;
+    for (index_t i = 0; i < num_voxel; i++)
+    {
+        if (voxels[i].occupied && voxels[i].test)
+        {
+            bool all_negative = true;
+            uint64_t start_index = terms_array->indices[i];
+            uint64_t end_index = terms_array->indices[i + 1];
+            index_t buffer_index = start_index / terms_array->term_buffer_size;
+            index_t term_index = start_index % terms_array->term_buffer_size;
+
+            if (term_index == terms_array->term_buffer_size)
+            {
+                term_index = 0;
+                buffer_index++;
+            }
+            index_t previous_index = terms_array->terms[buffer_index][term_index];
+            index_t previous_image_index = previous_index / image_size;
+
+            for (; start_index != end_index; start_index++, term_index++)
+            {
+                if (term_index == terms_array->term_buffer_size)
+                {
+                    term_index = 0;
+                    buffer_index++;
+                }
+                index_t index = terms_array->terms[buffer_index][term_index];
+                index_t image_index = index / image_size;
+
+                if (previous_image_index == image_index)
+                {
+                    if (uniform->refer_image->coefficients[index] > 0)
+                    {
+                        all_negative = false;
+                    }
+                } else
+                {
+                    previous_image_index = image_index;
+                    if (all_negative)
+                    {
+                        break;
+                    } else
+                    {
+                        all_negative = true;
+                    }
+
+                    if (uniform->refer_image->coefficients[index] > 0)
+                    {
+                        all_negative = false;
+                    }
+                }
+            }
+
+            if (all_negative) // voxel is out of silhouette in an image
+            {
+                //                voxels[i].test = false;
+                voxels[i].occupied = false;
+
+                // update terms
+                start_index = terms_array->indices[i];
+                end_index = terms_array->indices[i + 1];
+                buffer_index = start_index / terms_array->term_buffer_size;
+                term_index = start_index % terms_array->term_buffer_size;
+
+                for (uint64_t j = start_index; j < end_index; j++, term_index++)
+                {
+                    if (term_index == terms_array->term_buffer_size)
+                    {
+                        term_index = 0;
+                        buffer_index++;
+                    }
+                    occupied_config[terms_array->terms[buffer_index][term_index]]--;
+                }
+            }
+        }
+    }
+
+    for (index_t i = 0; i < num_voxel; i++)
+    {
+        update_bound(i);
+    }
+    for (index_t i = 0; i < num_voxel; i++)
+    {
+        if (voxels[i].bound ^ BOUND)
+        {
+            if (voxels[i].bound != 0)
+            {
+                voxels[i].test = true;
+            } else // single voxel which is without neighbors, make it not be tested
+            {
+                if (!voxels[i].occupied)
+                {
+                    voxels[i].test = false;
+                } else // should test if is occupied
+                {
+                    voxels[i].test = true;
+                }
+            }
+        } else
+        {
+            voxels[i].test = false;
+        }
+    }
+}
+
+void Model::cut() const
+{
+    for (index_t i = 0; i < num_voxel; i++)
+    {
+        if(voxels[i].occupied && (voxels[i].bound ^ BOUND))
+        {
+            voxels[i].occupied = false;
+        }
+    }
+}
+
 void Model::convert_polygon_mesh(vector<Vertex> &_vertices, vector<Triangle> &_triangles) const
 {
     int num_hull = 0;
-    auto *output_index = new int32_t[num_vertices];
+    auto *output_index = new index_t[num_vertices];
+    index_t max = 1 << 31;
     for (index_t i = 0; i < num_vertices; i++)
     {
-        output_index[i] = -1; // means empty
+        output_index[i] = max; // means empty
     }
     index_t voxel_index = 0;
-    int32_t current_index = 0;
+    index_t current_index = 0;
     vector<index_t> vertex_index;
 
     // update bound information
@@ -621,28 +733,28 @@ void Model::convert_polygon_mesh(vector<Vertex> &_vertices, vector<Triangle> &_t
 
                     if (!(voxels[voxel_index].bound & FRONT))
                     {
-                        if (output_index[v_2] == -1)
+                        if (output_index[v_2] == max)
                         {
                             output_index[v_2] = current_index;
                             _vertices.push_back(vertices[v_2]);
                             vertex_index.push_back(v_2);
                             current_index++;
                         }
-                        if (output_index[v_3] == -1)
+                        if (output_index[v_3] == max)
                         {
                             output_index[v_3] = current_index;
                             _vertices.push_back(vertices[v_3]);
                             vertex_index.push_back(v_3);
                             current_index++;
                         }
-                        if (output_index[v_6] == -1)
+                        if (output_index[v_6] == max)
                         {
                             output_index[v_6] = current_index;
                             _vertices.push_back(vertices[v_6]);
                             vertex_index.push_back(v_6);
                             current_index++;
                         }
-                        if (output_index[v_7] == -1)
+                        if (output_index[v_7] == max)
                         {
                             output_index[v_7] = current_index;
                             _vertices.push_back(vertices[v_7]);
@@ -654,28 +766,28 @@ void Model::convert_polygon_mesh(vector<Vertex> &_vertices, vector<Triangle> &_t
                     }
                     if (!(voxels[voxel_index].bound & BACK))
                     {
-                        if (output_index[v_0] == -1)
+                        if (output_index[v_0] == max)
                         {
                             output_index[v_0] = current_index;
                             _vertices.push_back(vertices[v_0]);
                             vertex_index.push_back(v_0);
                             current_index++;
                         }
-                        if (output_index[v_1] == -1)
+                        if (output_index[v_1] == max)
                         {
                             output_index[v_1] = current_index;
                             _vertices.push_back(vertices[v_1]);
                             vertex_index.push_back(v_1);
                             current_index++;
                         }
-                        if (output_index[v_4] == -1)
+                        if (output_index[v_4] == max)
                         {
                             output_index[v_4] = current_index;
                             _vertices.push_back(vertices[v_4]);
                             vertex_index.push_back(v_4);
                             current_index++;
                         }
-                        if (output_index[v_5] == -1)
+                        if (output_index[v_5] == max)
                         {
                             output_index[v_5] = current_index;
                             _vertices.push_back(vertices[v_5]);
@@ -687,28 +799,28 @@ void Model::convert_polygon_mesh(vector<Vertex> &_vertices, vector<Triangle> &_t
                     }
                     if (!(voxels[voxel_index].bound & LEFT))
                     {
-                        if (output_index[v_0] == -1)
+                        if (output_index[v_0] == max)
                         {
                             output_index[v_0] = current_index;
                             _vertices.push_back(vertices[v_0]);
                             vertex_index.push_back(v_0);
                             current_index++;
                         }
-                        if (output_index[v_2] == -1)
+                        if (output_index[v_2] == max)
                         {
                             output_index[v_2] = current_index;
                             _vertices.push_back(vertices[v_2]);
                             vertex_index.push_back(v_2);
                             current_index++;
                         }
-                        if (output_index[v_4] == -1)
+                        if (output_index[v_4] == max)
                         {
                             output_index[v_4] = current_index;
                             _vertices.push_back(vertices[v_4]);
                             vertex_index.push_back(v_4);
                             current_index++;
                         }
-                        if (output_index[v_6] == -1)
+                        if (output_index[v_6] == max)
                         {
                             output_index[v_6] = current_index;
                             _vertices.push_back(vertices[v_6]);
@@ -720,28 +832,28 @@ void Model::convert_polygon_mesh(vector<Vertex> &_vertices, vector<Triangle> &_t
                     }
                     if (!(voxels[voxel_index].bound & RIGHT))
                     {
-                        if (output_index[v_1] == -1)
+                        if (output_index[v_1] == max)
                         {
                             output_index[v_1] = current_index;
                             _vertices.push_back(vertices[v_1]);
                             vertex_index.push_back(v_1);
                             current_index++;
                         }
-                        if (output_index[v_3] == -1)
+                        if (output_index[v_3] == max)
                         {
                             output_index[v_3] = current_index;
                             _vertices.push_back(vertices[v_3]);
                             vertex_index.push_back(v_3);
                             current_index++;
                         }
-                        if (output_index[v_5] == -1)
+                        if (output_index[v_5] == max)
                         {
                             output_index[v_5] = current_index;
                             _vertices.push_back(vertices[v_5]);
                             vertex_index.push_back(v_5);
                             current_index++;
                         }
-                        if (output_index[v_7] == -1)
+                        if (output_index[v_7] == max)
                         {
                             output_index[v_7] = current_index;
                             _vertices.push_back(vertices[v_7]);
@@ -753,28 +865,28 @@ void Model::convert_polygon_mesh(vector<Vertex> &_vertices, vector<Triangle> &_t
                     }
                     if (!(voxels[voxel_index].bound & TOP))
                     {
-                        if (output_index[v_4] == -1)
+                        if (output_index[v_4] == max)
                         {
                             output_index[v_4] = current_index;
                             _vertices.push_back(vertices[v_4]);
                             vertex_index.push_back(v_4);
                             current_index++;
                         }
-                        if (output_index[v_5] == -1)
+                        if (output_index[v_5] == max)
                         {
                             output_index[v_5] = current_index;
                             _vertices.push_back(vertices[v_5]);
                             vertex_index.push_back(v_5);
                             current_index++;
                         }
-                        if (output_index[v_6] == -1)
+                        if (output_index[v_6] == max)
                         {
                             output_index[v_6] = current_index;
                             _vertices.push_back(vertices[v_6]);
                             vertex_index.push_back(v_6);
                             current_index++;
                         }
-                        if (output_index[v_7] == -1)
+                        if (output_index[v_7] == max)
                         {
                             output_index[v_7] = current_index;
                             _vertices.push_back(vertices[v_7]);
@@ -786,28 +898,28 @@ void Model::convert_polygon_mesh(vector<Vertex> &_vertices, vector<Triangle> &_t
                     }
                     if (!(voxels[voxel_index].bound & BOTTOM))
                     {
-                        if (output_index[v_0] == -1)
+                        if (output_index[v_0] == max)
                         {
                             output_index[v_0] = current_index;
                             _vertices.push_back(vertices[v_0]);
                             vertex_index.push_back(v_0);
                             current_index++;
                         }
-                        if (output_index[v_1] == -1)
+                        if (output_index[v_1] == max)
                         {
                             output_index[v_1] = current_index;
                             _vertices.push_back(vertices[v_1]);
                             vertex_index.push_back(v_1);
                             current_index++;
                         }
-                        if (output_index[v_2] == -1)
+                        if (output_index[v_2] == max)
                         {
                             output_index[v_2] = current_index;
                             _vertices.push_back(vertices[v_2]);
                             vertex_index.push_back(v_2);
                             current_index++;
                         }
-                        if (output_index[v_3] == -1)
+                        if (output_index[v_3] == max)
                         {
                             output_index[v_3] = current_index;
                             _vertices.push_back(vertices[v_3]);
@@ -980,7 +1092,7 @@ bool Model::is_bound(index_t index_x, index_t index_y, index_t index_z, Directio
     }
 }
 
-void Model::draw_triangle(const Vertex &v_0, const Vertex &v_1, const Vertex &v_2) const
+void Model::draw_triangle(const Vertex &v_0, const Vertex &v_1, const Vertex &v_2, bool occupied) const
 {
     int camera_order = 0;
     num_triangle++;
@@ -1034,7 +1146,10 @@ void Model::draw_triangle(const Vertex &v_0, const Vertex &v_1, const Vertex &v_
                     if (is_in_triangle(AB, BC, CA))
                     {
                         index_t term_index = offset + i * camera->x + j;
-                        occupied_config[term_index]++;
+                        if (occupied)
+                        {
+                            occupied_config[term_index]++;
+                        }
                         if (terms_array->capacity == terms_array->num_terms)
                         {
                             terms_array->increase_buffer();
@@ -1050,16 +1165,13 @@ void Model::draw_triangle(const Vertex &v_0, const Vertex &v_1, const Vertex &v_
     }
 }
 
-void Model::draw_circle(const float4 &c) const
+void Model::draw_circle(const float4 &c, bool occupied) const
 {
-    int camera_order = 0;
+    index_t offset = 0;
     num_triangle++;
 
     for (const auto &camera: *uniform->cameras)
     {
-        index_t offset = camera_order * camera->x * camera->y;
-        camera_order++;
-
         float4 edge = camera->M_view * c;
         edge.x() += voxel_radius;
         float4 center = camera->P * c;
@@ -1067,6 +1179,7 @@ void Model::draw_circle(const float4 &c) const
         edge = camera->PV * edge;
         edge = edge / edge.w();
         float r = edge.x() - center.x();
+        //        r = r < 0.5f ? 0.5f : r;
         float r2 = r * r;
 
         // real bounding box
@@ -1075,31 +1188,44 @@ void Model::draw_circle(const float4 &c) const
         int max_x = min((int)(center.x() + r) + 1, camera->x - 1);
         int max_y = min((int)(center.y() + r) + 1, camera->y - 1);
 
+        float x0 = float(min_x) + 0.5f;
+        float y0 = float(min_y) + 0.5f;
+
         // rasterization
+        float p_y = y0;
+        index_t term_index = offset + min_y * camera->x;
         for (int i = min_y; i <= max_y; i++)
         {
+            float p_x = x0;
+            index_t index = term_index + min_x;
+
             for (int j = min_x; j <= max_x; j++)
             {
-                float p_x = float(j) + 0.5f;
-                float p_y = float(i) + 0.5f;
                 float dx = center.x() - p_x;
                 float dy = center.y() - p_y;
 
                 if (dx * dx + dy * dy < r2)
                 {
-                    index_t term_index = offset + i * camera->x + j;
-                    occupied_config[term_index]++;
+                    if (occupied)
+                    {
+                        occupied_config[index]++;
+                    }
                     if (terms_array->capacity == terms_array->num_terms)
                     {
                         terms_array->increase_buffer();
                     }
 
-                    terms_array->terms[terms_array->buffer_index][terms_array->term_index] = term_index;
+                    terms_array->terms[terms_array->buffer_index][terms_array->term_index] = index;
                     terms_array->num_terms++;
                     terms_array->term_index++;
                 }
+                p_x += 1.0f;
+                index++;
             }
+            p_y += 1.0f;
+            term_index += camera->x;
         }
+        offset += camera->x * camera->y;
     }
 }
 
@@ -1203,6 +1329,42 @@ void Model::write_sie(const string &directory) const
         image.data[i] = occupied_config[i] > 0 ? 255 : 0;
     }
     iodata::write_sie(directory, image, *uniform->refer_image);
+}
+
+void Model::propagate_labels(Model *child) const
+{
+    cout << "propagate labels..." << endl;
+    assert(child->x / x == 2 && child->y / y == 2 && child->z / z == 2);
+    index_t voxel_index = 0;
+    bool padding_x = child->x % x == 0;
+    bool padding_y = child->y % y == 0;
+    bool padding_z = child->z % z == 0;
+
+    for (int i = 0; i < child->num_voxel; i++)
+    {
+        child->voxels[i].occupied = false;
+    }
+
+    for (int index_z = 0; index_z < child->z; index_z++)
+    {
+        index_t parent_z = index_z / 2;
+        bool edge_z = (index_z != child->z - 1) || padding_z;
+        for (int index_x = 0; index_x < child->x; index_x++)
+        {
+            index_t parent_x = index_x / 2;
+            bool edge_x = (index_x != child->x - 1) || padding_x;
+            for (int index_y = 0; index_y < child->y; index_y++, voxel_index++)
+            {
+                bool edge_y = (index_y != child->y - 1) || padding_y;
+                if (edge_z && edge_x && edge_y)
+                {
+                    index_t parent_y = index_y / 2;
+                    index_t parent_index = y * (parent_z * x + parent_x) + parent_y;
+                    child->voxels[voxel_index].occupied = voxels[parent_index].occupied;
+                }
+            }
+        }
+    }
 }
 
 void Model::correspond()

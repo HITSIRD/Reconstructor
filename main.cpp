@@ -9,10 +9,10 @@ int main(int argc, char *argv[])
     {
         string voxel_config = argv[1]; // model file name
         string config = argv[2]; // model file name
-        int mode = atoi(argv[3]); // calibration correction mode
+        SfS::MODE mode = (SfS::MODE)atoi(argv[3]); // calibration correction mode
 
         auto *sfs = new SfIS(voxel_config, config);
-        sfs->render(static_cast<SfS::MODE>(mode));
+        sfs->render(mode);
         delete sfs;
         return 0;
     }

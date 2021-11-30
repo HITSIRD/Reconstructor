@@ -105,8 +105,8 @@ public:
     float voxel_size;
     float voxel_radius;
     error_t sfis_error;
-    int32_t false_positive;
-    int32_t false_negative;
+//    error_t false_positive;
+//    error_t false_negative;
 
     Voxel *voxels; // voxel configuration in grid
     index_t num_vertices;
@@ -194,11 +194,25 @@ public:
     //     void write_contour_2d_points() const;
 
     /**
+     * Propagate occupied configuration labels to child model divided by parent model.
+     */
+    void propagate_labels(Model *child) const;
+
+    /**
      *
      */
     void correspond();
 
+    /**
+     *
+     */
+    void cut() const;
 private:
+    /**
+     *
+     */
+    void culling();
+
     /**
      *
      */
@@ -244,14 +258,16 @@ private:
      * @param v_0
      * @param v_1
      * @param v_2
+     * @param occupied
      */
-    void draw_triangle(const Vertex &v_0, const Vertex &v_1, const Vertex &v_2) const;
+    void draw_triangle(const Vertex &v_0, const Vertex &v_1, const Vertex &v_2, bool occupied) const;
 
     /**
      *
      * @param c center world coordinate
+     * @param occupied
      */
-    void draw_circle(const float4 &c) const;
+    void draw_circle(const float4 &c, bool occupied) const;
 
     /**
      *

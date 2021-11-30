@@ -5,9 +5,9 @@
 #include "Image.hpp"
 #include <cassert>
 
-Image::Image(index_t _x, index_t _y, index_t _num_camera):x(_x), y(_y), num_camera(_num_camera)
+Image::Image(int _x, int _y, int _num_camera):x(_x), y(_y), num_camera(_num_camera)
 {
-    index_t size = x * y * num_camera;
+    int size = x * y * num_camera;
     data = new unsigned char[size];
     coefficients = new int8_t[size];
     contours = new bool[size];
@@ -24,10 +24,10 @@ Image::~Image()
     delete[] contours;
 }
 
-void Image::set_data(index_t offset, const unsigned char *d) const
+void Image::set_data(int offset, const unsigned char *d) const
 {
-    index_t base = offset * x * y;
-    for (index_t i = base, j = 0; i < base + x * y; i++, j++)
+    int base = offset * x * y;
+    for (int i = base, j = 0; i < base + x * y; i++, j++)
     {
         data[i] = d[j];
         int prob_occ = (int)d[j] / 2;

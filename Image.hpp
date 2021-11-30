@@ -11,9 +11,9 @@
 class Image
 {
 public:
-    index_t x; // width of image
-    index_t y; // height of image
-    index_t num_camera; // number of images shot by each camera
+    int x; // width of image
+    int y; // height of image
+    int num_camera; // number of images shot by each camera
     unsigned char *data;
     int8_t *coefficients;
     bool *contours; // reference images contours, true means a point in contour, index is same as refer_image data
@@ -24,7 +24,7 @@ public:
      * @param _y height
      * @param channel
      */
-    Image(index_t _x, index_t _y, index_t _num_camera);
+    Image(int _x, int _y, int _num_camera);
 
     ~Image();
 
@@ -33,7 +33,7 @@ public:
      * @param offset image order
      * @param d
      */
-    void set_data(index_t offset, const unsigned char *d) const;
+    void set_data(int offset, const unsigned char *d) const;
 
     Image operator-(Image &img);
 };
