@@ -9,12 +9,12 @@
 #include <opencv2/imgproc.hpp>
 
 using namespace std;
+using namespace sfs;
 
-void iodata::read_config(
-        const string &file_name, std::vector<Camera *> &camera, Image *refer_image, BoundingBox &bounding_box,
-        float &voxel_size, int &iteration)
-{
-    cout << "configuration: " << file_name << endl;
+void iodata::readConfig(
+        const string &fileName, std::vector<Camera *> &camera, Image *referImage, BoundingBox &boundingBox,
+        float &voxelSize, int &iteration) {
+    cout << "configuration: " << fileName << endl;
     ifstream in;
     int num_camera;
     float x, y, z;
@@ -27,9 +27,8 @@ void iodata::read_config(
 
     string term;
 
-    in.open(file_name.c_str());
-    if (!in.is_open())
-    {
+    in.open(fileName.c_str());
+    if (!in.is_open()) {
         cerr << "FAIL TO OPEN FILE" << endl;
         throw exception();
     }
@@ -39,27 +38,23 @@ void iodata::read_config(
 
     // load bounding box
     in >> x >> y >> z;
-    bounding_box.min_point << x, y, z;
+    boundingBox.minPoint << x, y, z;
     in >> x >> y >> z;
-    bounding_box.max_point << x, y, z;
-    bounding_box.bounding_box_size = bounding_box.max_point - bounding_box.min_point;
+    boundingBox.maxPoint << x, y, z;
+    boundingBox.boundingBoxSize = boundingBox.maxPoint - boundingBox.minPoint;
 
     in >> term;
-    if (term == "VOXEL_SIZE")
-    {
-        in >> voxel_size;
-    } else
-    {
+    if (term == "VOXEL_SIZE") {
+        in >> voxelSize;
+    } else {
         cerr << "FILE FORMAT ERROR" << endl;
         throw exception();
     }
 
     in >> term;
-    if (term == "ITERATION")
-    {
+    if (term == "ITERATION") {
         in >> iteration;
-    } else
-    {
+    } else {
         cerr << "FILE FORMAT ERROR" << endl;
         throw exception();
     }
@@ -67,14 +62,13 @@ void iodata::read_config(
     // load camera inner parameters
     in >> pixel_x >> pixel_y >> ccd_size_x >> ccd_size_y >> focal;
 
-    refer_image = new Image(pixel_x, pixel_y, num_camera);
+    referImage = new Image(pixel_x, pixel_y, num_camera);
 
-    for (int i = 0; i < num_camera; i++)
-    {
+    for (int i = 0; i < num_camera; i++) {
         in >> image_file;
         cv::Mat image = cv::imread(image_file, cv::IMREAD_GRAYSCALE);
         cout << "image " << i << ": " << image_file << endl;
-        refer_image->set_data(i, image.data);
+        referImage->setData(i, image.data);
 
         in >> camera_center_x >> camera_center_y >> camera_center_z;
         in >> focal_center_x >> focal_center_y >> focal_center_z;
@@ -87,8 +81,8 @@ void iodata::read_config(
         float4 camera_center(camera_center_x / 100.0f, camera_center_y / 100.0f, camera_center_z / 100.0f, 1.0f);
         float4 focal_center(focal_center_x / 100.0f, focal_center_y / 100.0f, focal_center_z / 100.0f, 1.0f);
         float4 up(up_x, up_y, up_z, 0);
-        c->set_viewport(pixel_x, pixel_y, ccd_size_x, ccd_size_y, focal);
-        c->set_look_at(camera_center, focal_center, up);
+        c->setViewport(pixel_x, pixel_y, ccd_size_x, ccd_size_y, focal);
+        c->setLookAt(camera_center, focal_center, up);
         camera.push_back(c);
     }
     in.close();
@@ -96,9 +90,8 @@ void iodata::read_config(
     cout << "image size: " << pixel_x << "x" << pixel_y << endl;
 }
 
-void iodata::read_config(const string &voxel_config, const string &config, SfIS &sfis)
-{
-    cout << "voxel configuration: " << voxel_config << endl;
+void iodata::readConfig(const string &voxelConfig, const string &config, SfIS &sfis) {
+    cout << "voxel configuration: " << voxelConfig << endl;
     cout << "image configuration: " << config << endl;
     ifstream in;
     int num_camera;
@@ -110,35 +103,46 @@ void iodata::read_config(const string &voxel_config, const string &config, SfIS 
     string term;
 
     // load voxel configuration
-    in.open(voxel_config.c_str());
-    if (!in.is_open())
-    {
+    in.open(voxelConfig.c_str());
+    if (!in.is_open()) {
         cerr << "FAIL TO OPEN FILE" << endl;
         throw exception();
     }
     // load bounding box
     in >> x >> y >> z;
-    sfis.bounding_box.min_point << x, y, z;
+    sfis.boundingBox.minPoint << x, y, z;
     in >> x >> y >> z;
-    sfis.bounding_box.max_point << x, y, z;
-    sfis.bounding_box.bounding_box_size = sfis.bounding_box.max_point - sfis.bounding_box.min_point;
+    sfis.boundingBox.maxPoint << x, y, z;
+    sfis.boundingBox.boundingBoxSize = sfis.boundingBox.maxPoint - sfis.boundingBox.minPoint;
 
     in >> term;
-    if (term == "VOXEL_SIZE")
-    {
-        in >> sfis.expected_voxel_size;
-    } else
-    {
+    if (term == "VOXEL_SIZE") {
+        in >> sfis.expectedVoxelSize;
+    } else {
         cerr << "FILE FORMAT ERROR" << endl;
         throw exception();
     }
 
     in >> term;
-    if (term == "ITERATION")
-    {
+    if (term == "ITERATION") {
         in >> sfis.iteration;
-    } else
-    {
+    } else {
+        cerr << "FILE FORMAT ERROR" << endl;
+        throw exception();
+    }
+
+    in >> term;
+    if (term == "SAI") {
+        in >> term;
+        if (term == "ON") {
+            sfis.selfAdaptive = true;
+        } else if (term == "OFF") {
+            sfis.selfAdaptive = false;
+        } else {
+            cerr << "FILE FORMAT ERROR" << endl;
+            throw exception();
+        }
+    } else {
         cerr << "FILE FORMAT ERROR" << endl;
         throw exception();
     }
@@ -147,8 +151,7 @@ void iodata::read_config(const string &voxel_config, const string &config, SfIS 
 
     // load image configuration
     in.open(config.c_str());
-    if (!in.is_open())
-    {
+    if (!in.is_open()) {
         cerr << "FAIL TO OPEN FILE" << endl;
         throw exception();
     }
@@ -159,15 +162,14 @@ void iodata::read_config(const string &voxel_config, const string &config, SfIS 
     // load camera inner parameters
     in >> pixel_x >> pixel_y >> ccd_size_x >> ccd_size_y >> focal;
 
-    sfis.refer_image = new Image(pixel_x, pixel_y, num_camera);
+    sfis.referImage = new Image(pixel_x, pixel_y, num_camera);
 
-    for (int i = 0; i < num_camera; i++)
-    {
+    for (int i = 0; i < num_camera; i++) {
         in >> image_file;
         cv::Mat image = cv::imread(image_file, cv::IMREAD_GRAYSCALE);
         cv::threshold(image, image, 1, 255, cv::THRESH_BINARY);
         cout << "image " << i << ": " << image_file << endl;
-        sfis.refer_image->set_data(i, image.data);
+        sfis.referImage->setData(i, image.data);
 
         in >> view_00 >> view_01 >> view_02;
         in >> view_10 >> view_11 >> view_12;
@@ -179,8 +181,8 @@ void iodata::read_config(const string &voxel_config, const string &config, SfIS 
         float3 t(view_03, view_13, view_23);
 
         auto c = new Camera();
-        c->set_viewport(pixel_x, pixel_y, ccd_size_x, ccd_size_y, focal);
-        c->set_look_at(R, t);
+        c->setViewport(pixel_x, pixel_y, ccd_size_x, ccd_size_y, focal);
+        c->setLookAt(R, t);
         sfis.cameras.push_back(c);
     }
     in.close();
@@ -188,21 +190,19 @@ void iodata::read_config(const string &voxel_config, const string &config, SfIS 
     cout << "image size: " << pixel_x << "x" << pixel_y << endl;
 }
 
-void iodata::write_ply(const string &directory, Model *model)
-{
-//    string command = "touch " + directory + "/model.ply";
-//    system(command.c_str());
+void iodata::writePly(const string &directory, Model *model) {
+    //    string command = "touch " + directory + "/model.ply";
+    //    system(command.c_str());
 
     string outfile = directory + "/model.ply";
     cout << "writing to " << outfile << endl;
 
     vector<Vertex> vertices;
     vector<Triangle> triangles;
-    model->convert_polygon_mesh(vertices, triangles);
+    model->convertPolygonMesh(vertices, triangles);
     std::ofstream out;
     out.open(outfile.c_str());
-    if (!out.is_open())
-    {
+    if (!out.is_open()) {
         cerr << "FAIL TO OPEN FILE" << endl;
         throw exception();
     }
@@ -217,28 +217,25 @@ void iodata::write_ply(const string &directory, Model *model)
     out << "property list uchar int vertex_indices" << endl;
     out << "end_header" << endl;
 
-    for (const auto &vertex: vertices)
-    {
-        out << vertex.world.x() << " " << vertex.world.y() << " " << vertex.world.z() << endl;
+    for (const auto &vertex: vertices) {
+        out << vertex.position.x() << " " << vertex.position.y() << " " << vertex.position.z() << endl;
     }
 
-    for (const auto &triangle: triangles)
-    {
-        out << "3 " << triangle.vertex_0 << " " << triangle.vertex_1 << " " << triangle.vertex_2 << endl;
+    for (const auto &triangle: triangles) {
+        out << "3 " << triangle.vertexIndex[0] << " " << triangle.vertexIndex[1] << " " << triangle.vertexIndex[2]
+                << endl;
     }
 
     out.close();
 }
 
-void iodata::write_projection(const string &directory, const Image &image)
-{
+void iodata::writeProjection(const string &directory, const Image &image) {
     string equation = "\"";
     string command = "mkdir -p " + equation + directory + "/Projection" + equation;
     system(command.c_str());
     stringstream ss;
     string number;
-    for (int i = 0; i < image.num_camera; i++)
-    {
+    for (int i = 0; i < image.numCameras; i++) {
         ss.clear();
         ss << setw(4) << setfill('0') << i;
         ss >> number;
@@ -247,23 +244,20 @@ void iodata::write_projection(const string &directory, const Image &image)
 
         index_t size = image.x * image.y;
         index_t offset = i * size;
-        for (index_t j = 0; j < size; j++)
-        {
+        for (index_t j = 0; j < size; j++) {
             img.data[j] = image.data[offset + j];
         }
         cv::imwrite(file_name, img);
     }
 }
 
-void iodata::write_test(const string &directory, const Image &image)
-{
+void iodata::writeTest(const string &directory, const Image &image) {
     string equation = "\"";
     string command = "mkdir -p " + equation + directory + "/Test" + equation;
     system(command.c_str());
     stringstream ss;
     string number;
-    for (int i = 0; i < image.num_camera; i++)
-    {
+    for (int i = 0; i < image.numCameras; i++) {
         ss.clear();
         ss << setw(4) << setfill('0') << i;
         ss >> number;
@@ -272,16 +266,14 @@ void iodata::write_test(const string &directory, const Image &image)
 
         index_t size = image.x * image.y;
         index_t offset = i * size;
-        for (index_t j = 0; j < size; j++)
-        {
+        for (index_t j = 0; j < size; j++) {
             img.data[j] = image.data[offset + j];
         }
         cv::imwrite(file_name, img);
     }
 }
 
-void iodata::write_sie(const string &directory, const Image &image, const Image &refer)
-{
+void iodata::writeSie(const string &directory, const Image &image, const Image &refer) {
     string equation = "\"";
     string command = "mkdir -p " + equation + directory + "/sie" + equation;
     system(command.c_str());
@@ -290,8 +282,7 @@ void iodata::write_sie(const string &directory, const Image &image, const Image 
     cv::Mat img = cv::Mat(image.y, image.x, CV_8UC3);
     int size = image.x * image.y;
 
-    for (int i = 0; i < image.num_camera; i++)
-    {
+    for (int i = 0; i < image.numCameras; i++) {
         ss.clear();
         ss << setw(4) << setfill('0') << i;
         ss >> number;
@@ -299,34 +290,29 @@ void iodata::write_sie(const string &directory, const Image &image, const Image 
 
         int index = i * size;
         auto *p = img.data;
-        for (int j = 0; j < size; j++, index++)
-        {
-            if (image.data[index] > 0 && refer.coefficients[index] > 0)
-            {
+        for (int j = 0; j < size; j++, index++) {
+            if (image.data[index] > 0 && refer.coefficients[index] > 0) {
                 *p = 255; // B
                 p++;
                 *p = 255; // G
                 p++;
                 *p = 255; // R
                 p++;
-            } else if (image.data[index] == 0 && refer.coefficients[index] < 0)
-            {
+            } else if (image.data[index] == 0 && refer.coefficients[index] < 0) {
                 *p = 0; // B
                 p++;
                 *p = 0; // G
                 p++;
                 *p = 0; // R
                 p++;
-            } else if (image.data[index] > 0 && refer.coefficients[index] < 0)
-            {
+            } else if (image.data[index] > 0 && refer.coefficients[index] < 0) {
                 *p = 0; // B
                 p++;
                 *p = 0; // G
                 p++;
                 *p = 255; // R
                 p++;
-            } else if (image.data[index] == 0 && refer.coefficients[index] > 0)
-            {
+            } else if (image.data[index] == 0 && refer.coefficients[index] > 0) {
                 *p = 255; // B
                 p++;
                 *p = 0; // G
@@ -339,15 +325,13 @@ void iodata::write_sie(const string &directory, const Image &image, const Image 
     }
 }
 
-void iodata::write_refer_contours(const string &directory, const Image &image)
-{
+void iodata::writeReferContours(const string &directory, const Image &image) {
     string equation = "\"";
     string command = "mkdir -p " + equation + directory + "/Reference contours" + equation;
     system(command.c_str());
     stringstream ss;
     string number;
-    for (int i = 0; i < image.num_camera; i++)
-    {
+    for (int i = 0; i < image.numCameras; i++) {
         ss.clear();
         ss << setw(4) << setfill('0') << i;
         ss >> number;
@@ -356,23 +340,20 @@ void iodata::write_refer_contours(const string &directory, const Image &image)
 
         index_t size = image.x * image.y;
         index_t offset = i * size;
-        for (index_t j = 0; j < size; j++)
-        {
+        for (index_t j = 0; j < size; j++) {
             img.data[j] = image.data[offset + j];
         }
         cv::imwrite(file_name, img);
     }
 }
 
-void iodata::write_recon_contours(const string &directory, const Image &image)
-{
+void iodata::writeReconContours(const string &directory, const Image &image) {
     string equation = "\"";
     string command = "mkdir -p " + equation + directory + "/Reconstruction contours" + equation;
     system(command.c_str());
     stringstream ss;
     string number;
-    for (int i = 0; i < image.num_camera; i++)
-    {
+    for (int i = 0; i < image.numCameras; i++) {
         ss.clear();
         ss << setw(4) << setfill('0') << i;
         ss >> number;
@@ -381,8 +362,7 @@ void iodata::write_recon_contours(const string &directory, const Image &image)
 
         index_t size = image.x * image.y;
         index_t offset = i * size;
-        for (index_t j = 0; j < size; j++)
-        {
+        for (index_t j = 0; j < size; j++) {
             img.data[j] = image.data[offset + j];
         }
         cv::imwrite(file_name, img);
